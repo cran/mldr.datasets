@@ -15,7 +15,7 @@
 #' }
 #' @export
 write.mldr <- function(mld, format = c("MULAN", "MEKA"), sparse = FALSE, basename = ifelse(!is.null(mld$name) && nchar(mld$name) > 0,
-                                                                                           mld$name,
+                                                                                           regmatches(mld$name, regexpr("(\\w)+", mld$name)),
                                                                                            "unnamed_mldr")) {
   format <- toupper(format)
   available.formats <- c("MULAN", "MEKA", "KEEL", "CSV", "LIBSVM")
@@ -182,22 +182,27 @@ export.arff.data <- function(mld, sparse, header = "@data\n") {
 
 export.dense.arff.data <- function(data) {
   paste(
-    apply(data, 1, function(c)
-      paste(c, collapse = ',')
-    ),
+    do.call("paste", c(unname(data), list(sep = ','))),
     collapse = "\n"
   )
 }
 
 export.sparse.arff.data <- function(data) {
   paste(
-    apply(data, 1, function(instance)
-      paste0("{",
-             paste(which(instance != 0) - 1, # features start counting at 0
-                   instance[instance != 0],
-                   sep = " ", collapse = ","
-                   ),
-             "}")
+    apply(
+      # 'as.matrix' implicit conversion of a data.frame will insert spaces to adjust
+      # width of values (when the inferred data type is 'character'). To prevent
+      # this, a workaround needs to be done by manually formatting the data.frame.
+      # Source: http://stackoverflow.com/a/15618761
+      sapply(data, format, trim = TRUE, justify = "none"),
+      1, function(instance)
+        paste0("{",
+               paste(which(instance != 0) - 1, # features start counting at 0
+                     instance[instance != 0],
+                     sep = " ", collapse = ","
+                     ),
+              "}"
+        )
     ),
     collapse = "\n"
   )
@@ -212,7 +217,7 @@ export.csv.labels <- function(mld) {
 export.xml <- function(mld) {
   xmlheader <- '<?xml version="1.0" encoding="utf-8"?>'
   labelstag <- '<labels xmlns="http://mulan.sourceforge.net/labels">'
-  labeltags <- paste(c('<label name="'), rownames(mld$labels), c('"></label>'), sep = "\n")
+  labeltags <- paste(c('<label name="'), rownames(mld$labels), c('"></label>'), collapse = "\n", sep = "")
   labelsend <- '</labels>'
 
   paste(xmlheader, labelstag, labeltags, labelsend, sep = "\n")
