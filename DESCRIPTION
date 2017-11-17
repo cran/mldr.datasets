@@ -1,7 +1,7 @@
 Package: mldr.datasets
 Title: R Ultimate Multilabel Dataset Repository
-Version: 0.3.15
-Date: 2016-01-16
+Version: 0.4.0
+Date: 2017-11-17
 Authors@R: c( person("David", "Charte", email = "fdavidcl@outlook.com", role =
     "cre"), person("Francisco", "Charte", email = "francisco@fcharte.com", role
     = "aut"))
@@ -13,12 +13,12 @@ Depends: R (>= 3.0.0)
 Imports: utils
 License: LGPL (>= 3) | file LICENSE
 LazyData: true
-RoxygenNote: 5.0.1
+RoxygenNote: 6.0.1
 Suggests: mldr
 NeedsCompilation: no
-Packaged: 2016-01-16 11:00:48 UTC; fdavidcl
+Packaged: 2017-11-17 16:36:52 UTC; fdavidcl
 Author: David Charte [cre],
   Francisco Charte [aut]
 Maintainer: David Charte <fdavidcl@outlook.com>
 Repository: CRAN
-Date/Publication: 2016-01-16 13:12:17
+Date/Publication: 2017-11-17 17:01:24 UTC

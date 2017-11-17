@@ -1,4 +1,4 @@
-
+#
 # Functions to export a mldr object to several formats
 
 #' Export an mldr object or set of mldr objects to different file formats
@@ -8,15 +8,17 @@
 #' \code{'KEEL'}, \code{'CSV'} and \code{'LIBSVM'}
 #' @param sparse Boolean value indicating if sparse representation has to be used for ARFF-based file formats
 #' @param basename Base name for the files. \code{'unnamed_mldr'} is used by default
+#' @param ... Additional options for the exporting functions (e.g. \code{chunk_size}, the number of instances to write at a time)
 #' @examples
 #'\dontrun{
 #' library(mldr.datasets)
 #' write.mldr(emotions, format = c('CSV', 'KEEL'))
 #' }
+#'
 #' @export
 write.mldr <- function(mld, format = c("MULAN", "MEKA"), sparse = FALSE, basename = ifelse(!is.null(mld$name) && nchar(mld$name) > 0,
                                                                                            regmatches(mld$name, regexpr("(\\w)+", mld$name)),
-                                                                                           "unnamed_mldr")) {
+                                                                                           "unnamed_mldr"), ...) {
   format <- toupper(format)
   available.formats <- c("MULAN", "MEKA", "KEEL", "CSV", "LIBSVM")
 
@@ -25,11 +27,23 @@ write.mldr <- function(mld, format = c("MULAN", "MEKA"), sparse = FALSE, basenam
     stop("Invalid format found. Allowed formats: ", paste(available.formats, collapse = ", "))
   }
   if (!"mldr" %in% class(mld)) {
+    # Write all partitions from a partition list
     if ("mldr.folds" %in% class(mld))
-      invisible(lapply(1:length(mld), function(i) {
-        write.mldr(mld[[i]]$train, format, sparse, basename = paste0(basename, "-", i, 'x', length(mld), '-tra') )
-        write.mldr(mld[[i]]$test, format, sparse, basename = paste0(basename, "-", i, 'x', length(mld), '-test') )
-      }))
+      if (length(mld) >= 1 && class(mld[[1]]) == "mldr") {
+        suffix <- if (length(mld) == 2)
+          c("tra", "test")
+        else
+          paste0(as.character(1:length(mld)), "x", length(mld))
+
+        invisible(lapply(1:length(mld), function(i) {
+          write.mldr(mld[[i]], format, sparse, basename = paste0(basename, "-", suffix[i]))
+        }))
+      } else {
+        invisible(lapply(1:length(mld), function(i) {
+          write.mldr(mld[[i]]$train, format, sparse, basename = paste0(basename, "-", i, 'x', length(mld), '-tra') )
+          write.mldr(mld[[i]]$test, format, sparse, basename = paste0(basename, "-", i, 'x', length(mld), '-test') )
+        }))
+      }
     else
       stop("Object must be of class mldr or mldr.folds")
   } else {
@@ -40,15 +54,15 @@ write.mldr <- function(mld, format = c("MULAN", "MEKA"), sparse = FALSE, basenam
       # Open and write ARFF file
       if (!"MEKA" %in% format) {
         name <- paste0(basename, ".arff")
-        arffConnection <- file(name)
-        writeLines(export.mulan(mld, sparse), arffConnection)
+        arffConnection <- file(name, open = "w")
+        export.mulan(mld, sparse, arffConnection, ...)
         close(arffConnection)
         inform(name)
       }
 
       # Open and write XML file
       name <- paste0(basename, ".xml")
-      xmlConnection <- file(name)
+      xmlConnection <- file(name, open = "w")
       writeLines(export.xml(mld), xmlConnection)
       close(xmlConnection)
       inform(name)
@@ -57,8 +71,8 @@ write.mldr <- function(mld, format = c("MULAN", "MEKA"), sparse = FALSE, basenam
     if ("MEKA" %in% format) {
       # Open and write ARFF file
       name <- paste0(basename, ".arff")
-      arffConnection <- file(name)
-      writeLines(export.meka(mld, sparse), arffConnection)
+      arffConnection <- file(name, open = "w")
+      export.meka(mld, sparse, arffConnection, ...)
       close(arffConnection)
       inform(name)
     }
@@ -66,8 +80,8 @@ write.mldr <- function(mld, format = c("MULAN", "MEKA"), sparse = FALSE, basenam
     if ("KEEL" %in% format) {
       # Open and write DAT file
       name <- paste0(basename, ".dat")
-      datConnection <- file(name)
-      writeLines(export.keel(mld, sparse), datConnection)
+      datConnection <- file(name, open = "w")
+      export.keel(mld, sparse, datConnection, ...)
       close(datConnection)
       inform(name)
     }
@@ -75,13 +89,13 @@ write.mldr <- function(mld, format = c("MULAN", "MEKA"), sparse = FALSE, basenam
     if ("CSV" %in% format) {
       # Open and write CSV file
       name <- paste0(basename, ".csv")
-      csvConnection <- file(name)
-      writeLines(export.csv(mld, sparse), csvConnection)
+      csvConnection <- file(name, open = "w")
+      export.csv(mld, sparse, csvConnection, ...)
       close(csvConnection)
       inform(name)
 
       name <- paste0(basename, "_labels.csv")
-      labelConnection <- file(name)
+      labelConnection <- file(name, open = "w")
       writeLines(export.csv.labels(mld), labelConnection)
       close(labelConnection)
       inform(name)
@@ -90,60 +104,71 @@ write.mldr <- function(mld, format = c("MULAN", "MEKA"), sparse = FALSE, basenam
     if ("LIBSVM" %in% format) {
       # Open and write SVM file
       name <- paste0(basename, ".svm")
-      svmConnection <- file(name)
-      writeLines(export.libsvm(mld), svmConnection)
+      svmConnection <- file(name, open = "w")
+      export.libsvm(mld, svmConnection, ...)
       close(svmConnection)
       inform(name)
     }
   }
 }
 
-export.mulan <- function(mld, sparse) {
-  paste(
-    export.mulan.header(mld),
-    export.arff.attributes(mld),
-    export.arff.data(mld, sparse),
-    sep = "\n"
-  )
+export.mulan <- function(mld, sparse, con, ...) {
+  writeLines(export.mulan.header(mld), con)
+  writeLines(export.arff.attributes(mld), con)
+  export.arff.data(mld, sparse, con = con, ...)
 }
 
-export.meka <- function(mld, sparse) {
-  paste(
-    export.meka.header(mld),
-    export.arff.attributes(mld),
-    export.arff.data(mld, sparse),
-    sep = "\n"
-  )
+export.meka <- function(mld, sparse, con, ...) {
+  writeLines(export.meka.header(mld), con)
+  writeLines(export.arff.attributes(mld), con)
+  export.arff.data(mld, sparse, con = con, ...)
 }
 
-export.keel <- function(mld, sparse) {
-  paste(
-    export.keel.header(mld),
-    export.arff.attributes(mld),
-    export.arff.inputs(mld),
-    export.arff.outputs(mld),
-    export.arff.data(mld, sparse),
-    sep = "\n"
-  )
+export.keel <- function(mld, sparse, con, ...) {
+  writeLines(export.keel.header(mld), con)
+  writeLines(export.arff.attributes(mld), con)
+  writeLines(export.arff.inputs(mld), con)
+  writeLines(export.arff.outputs(mld), con)
+  export.arff.data(mld, sparse, con = con, ...)
 }
 
 export.mulan.header <- function(mld) {
-  paste0("@relation ", ifelse(!is.null(mld$name) && nchar(mld$name) > 0,
-                             mld$name,
-                             "unnamed_mldr"))
+  paste0("@relation ",
+         if (!is.null(mld$name) && nchar(mld$name) > 0)
+           mld$name
+         else
+           "unnamed_mldr")
 }
 
 export.meka.header <- function(mld) {
-  paste0("@relation '", ifelse(!is.null(mld$name) && nchar(mld$name) > 0,
-                             mld$name,
-                             "unnamed_mldr"),
-        ": -C ", mld$measures$num.labels, "'")
+  paste0("@relation '",
+         # Dataset name
+         if (!is.null(mld$name) && nchar(mld$name) > 0)
+           mld$name
+         else
+           "unnamed_mldr",
+         # MEKA option for number of labels
+         ": -C ",
+         # With a minus sign if they're at the end
+         if (mld$labels$index[1] == 1)
+           ""
+         else
+           "-",
+         mld$measures$num.labels,
+         "'")
 }
 
 export.keel.header <- export.mulan.header
 
 export.arff.attributes <- function(mld) {
-  paste0("@attribute ", names(mld$attributes), " ", mld$attributes, collapse = "\n")
+  attrNames <- ifelse(grepl("(\\s|\"|\')", names(mld$attributes)),
+                      paste0("'", gsub(
+                        "'", "\\'", names(mld$attributes), fixed = T
+                      ), "'"),
+                      names(mld$attributes))
+  paste("@attribute",
+         attrNames,
+         mld$attributes)
 }
 
 export.arff.inputs <- function(mld) {
@@ -170,48 +195,66 @@ export.arff.outputs <- function(mld) {
   )
 }
 
-export.arff.data <- function(mld, sparse, header = "@data\n") {
+export.arff.data <- function(mld, sparse, con, header = "@data\n", ...) {
   data <- mld$dataset[, 1:mld$measures$num.attributes]
   data[is.na(data)] <- '?'
-  paste0(
-    header,
-    ifelse(sparse, export.sparse.arff.data(data), export.dense.arff.data(data))
-  )
+
+  cat(header, file = con)
+  export.arff.chunks(data, con = con, sparse = sparse, ...)
 }
 
 
 export.dense.arff.data <- function(data) {
-  paste(
-    do.call("paste", c(unname(data), list(sep = ','))),
-    collapse = "\n"
-  )
+  do.call("paste", c(unname(data), list(sep = ',')))
 }
 
 export.sparse.arff.data <- function(data) {
-  paste(
-    apply(
-      # 'as.matrix' implicit conversion of a data.frame will insert spaces to adjust
-      # width of values (when the inferred data type is 'character'). To prevent
-      # this, a workaround needs to be done by manually formatting the data.frame.
-      # Source: http://stackoverflow.com/a/15618761
-      sapply(data, format, trim = TRUE, justify = "none"),
-      1, function(instance)
-        paste0("{",
-               paste(which(instance != 0) - 1, # features start counting at 0
-                     instance[instance != 0],
-                     sep = " ", collapse = ","
-                     ),
-              "}"
-        )
-    ),
-    collapse = "\n"
-  )
+  # skip type check since some datasets have factors read as character
+  # TODO improve read.arff to read binary factors as 0-1
+  #ischar <- sapply(data, is.character)
+  nonzero <- data != 0
+
+  sapply(1:nrow(data), function(i) {
+    select <- nonzero[i, ]
+    paste0(
+      "{",
+      paste(
+        which(select) - 1,
+        data[i, select],
+        sep = " ",
+        collapse = ","
+      ),
+      "}"
+    )
+  })
 }
 
-export.csv <- function(mld, sparse) export.arff.data(mld, sparse, header = "")
+export.arff.chunks <-
+  function(data,
+           con,
+           chunk_size = floor(1e6 / ncol(data)),
+           sparse = F,
+           fun = if (sparse)
+             export.sparse.arff.data
+           else
+             export.dense.arff.data) {
+    num_instances <- dim(data)[1]
+    chunks <- floor((num_instances - 1) / chunk_size)
+
+  for (ch in 0:chunks) {
+    start <- 1 + ch*chunk_size
+    end <- 1 + (ch + 1) * chunk_size
+    end <- if (end < num_instances) end else num_instances
+    chunk <- data[start:end, ]
+
+    writeLines(fun(chunk), con)
+  }
+}
+
+export.csv <- function(mld, sparse, con, ...) export.arff.data(mld, sparse = sparse, header = "", con = con, ...)
 
 export.csv.labels <- function(mld) {
-  paste(rownames(mld$labels), mld$labels$index, sep = ", ", collapse = "\n")
+  paste(rownames(mld$labels), mld$labels$index, sep = ", ")
 }
 
 export.xml <- function(mld) {
@@ -223,18 +266,38 @@ export.xml <- function(mld) {
   paste(xmlheader, labelstag, labeltags, labelsend, sep = "\n")
 }
 
-export.libsvm <- function(mld) {
-  paste(
-    apply(mld$dataset, 1, function(instance) {
-        inputs <- instance[mld$attributesIndexes]
-        outputs <- instance[mld$labels$index]
-        paste(
-          paste(which(outputs == 1) - 1, collapse = ","), # libSVM counts labels starting from zero
-          paste(which(instance != 0), instance[instance != 0], sep = ":", collapse = " "),
-          sep = " "
-        )
-      }
-    ),
-    collapse = "\n"
-  )
+export.libsvm <- function(mld, con,
+                          chunk_size = floor(1e6 / mld$measures$num.attributes)) {
+  num_instances <- mld$measures$num.instances
+  chunks <- floor((num_instances - 1) / chunk_size)
+  which.input <- mld$attributesIndexes
+  which.output <- mld$labels$index
+
+  for (ch in 0:chunks) {
+    start <- 1 + ch*chunk_size
+    end <- 1 + (ch + 1) * chunk_size
+    end <- if (end < num_instances) end else num_instances
+
+    writeLines(export.libsvm.data(
+      inputs = mld$dataset[start:end, which.input],
+      outputs = mld$dataset[start:end, which.output]
+    ), con)
+  }
+}
+
+export.libsvm.data <- function(inputs, outputs) {
+  # skip type check since some datasets have factors read as character
+  # ischar <- !sapply(inputs, is.numeric)
+  nonzero <- inputs != 0
+
+  sapply(1:nrow(inputs), function(i) {
+    select <- which(nonzero[i, ])
+    paste(
+      # libSVM counts labels starting from zero
+      # and attributes starting from one
+      paste(which(outputs[i, ] == 1) - 1, collapse = ","),
+      paste(select, inputs[i, select], sep = ":", collapse = " "),
+      sep = " "
+    )
+  })
 }

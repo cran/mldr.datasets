@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils.R
 \name{check_n_load.mldr}
 \alias{check_n_load.mldr}
-\title{Check if an mldr object is locally available and download it if needed}
+\title{(Deprecated) Check if an mldr object is locally available and download it if needed}
 \usage{
 check_n_load.mldr(mldr.name)
 }
@@ -20,4 +20,3 @@ check_n_load.mldr("bibtex")
 bibtex$measures
 }
 }
-

@@ -6,7 +6,7 @@
 \usage{
 write.mldr(mld, format = c("MULAN", "MEKA"), sparse = FALSE,
   basename = ifelse(!is.null(mld$name) && nchar(mld$name) > 0,
-  regmatches(mld$name, regexpr("(\\\\w)+", mld$name)), "unnamed_mldr"))
+  regmatches(mld$name, regexpr("(\\\\w)+", mld$name)), "unnamed_mldr"), ...)
 }
 \arguments{
 \item{mld}{The \code{mldr/mldr.folds} object to be exported}
@@ -17,6 +17,8 @@ write.mldr(mld, format = c("MULAN", "MEKA"), sparse = FALSE,
 \item{sparse}{Boolean value indicating if sparse representation has to be used for ARFF-based file formats}
 
 \item{basename}{Base name for the files. \code{'unnamed_mldr'} is used by default}
+
+\item{...}{Additional options for the exporting functions (e.g. \code{chunk_size}, the number of instances to write at a time)}
 }
 \description{
 Writes one or more files in the specified formats with the content of the \code{mldr} or \code{mldr.folds} given as parameter
@@ -26,5 +28,5 @@ Writes one or more files in the specified formats with the content of the \code{
 library(mldr.datasets)
 write.mldr(emotions, format = c('CSV', 'KEEL'))
 }
-}
 
+}
